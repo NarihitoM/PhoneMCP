@@ -1,7 +1,8 @@
-import { adb, AdbError, shell } from "../lib/adb.js";
+import { randomUUID } from "node:crypto";
+import { adb, AdbError } from "../lib/adb.js";
 import type { Bounds, UiElement } from "../types/index.js";
 
-const DUMP_PATH = "/sdcard/window_dump.xml";
+const DUMP_DIR = "/data/local/tmp";
 const NODE_PATTERN = /<node\b([^>]*?)\/?>/g;
 const ATTRIBUTE_PATTERN = /([\w-]+)="([^"]*)"/g;
 const BOUNDS_PATTERN = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/;
@@ -119,14 +120,19 @@ function cacheKey(serial?: string): string {
   return serial ?? process.env.ANDROID_SERIAL ?? "default";
 }
 
+function dumpCommand(): string {
+  const path = `${DUMP_DIR}/ui-${randomUUID()}.xml`;
+  return `out=$(uiautomator dump ${path}) && cat ${path} || echo "$out"; rm -f ${path}`;
+}
+
 async function dumpXml(serial?: string): Promise<string> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const result = await shell(`uiautomator dump ${DUMP_PATH}`, { serial });
-      if (/ERROR|null root node/i.test(result)) throw new AdbError(result.trim());
-      return await adb(["exec-out", "cat", DUMP_PATH], { serial });
+      const output = await adb(["exec-out", dumpCommand()], { serial });
+      if (!output.includes("<hierarchy")) throw new AdbError(output.trim() || "UI dump returned nothing");
+      return output;
     } catch (error) {
       lastError = error;
     }

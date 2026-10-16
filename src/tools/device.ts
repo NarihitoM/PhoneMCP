@@ -6,9 +6,11 @@ import { respond, serialParam } from "../lib/tool.js";
 import {
   ADDRESS_HINT,
   connect,
-  connectDiscovered,
   connectedSummary,
+  connectPaired,
+  describePhones,
   deviceInfo,
+  findPhones,
   isValidAddress,
   isValidPairingCode,
   listDevices,
@@ -90,8 +92,8 @@ export function registerDeviceTools(server: McpServer): void {
         if (!isValidPairingCode(details.code)) throw new AdbError(PAIRING_CODE_HINT);
 
         const paired = await pair(details.address, details.code);
-        await connectDiscovered(4);
-        return `${paired}\n${await connectedSummary()}`;
+        const connected = await connectPaired(details.address, paired);
+        return `${paired}\n${connected}\n${await connectedSummary()}`;
       }),
   );
 
@@ -100,7 +102,7 @@ export function registerDeviceTools(server: McpServer): void {
     {
       title: "Connect over Wi-Fi",
       description:
-        "Connect to a paired phone on the same Wi-Fi. Without an address it finds the phone automatically, and asks the user for the address if it cannot.",
+        "Connect to a paired phone on the same Wi-Fi. Without an address it finds the phone automatically when exactly one is on the network, and otherwise asks the user which address to use.",
       inputSchema: {
         address: addressParam.optional().describe("ip:port from the Wireless debugging screen (not the pairing port)"),
       },
@@ -109,14 +111,20 @@ export function registerDeviceTools(server: McpServer): void {
       respond(async () => {
         if (address) return connect(address);
 
-        const results = await connectDiscovered(2);
-        if (results.length > 0) return `${results.join("\n")}\n${await connectedSummary()}`;
+        const phones = await findPhones(2);
+        const [only] = phones;
+        if (phones.length === 1 && only) return `${await connect(only.address)}\n${await connectedSummary()}`;
 
         const hint =
-          "No phone found on Wi-Fi. Check Wireless debugging is on, both are on the same network, and the phone was paired (pair_wifi).";
-        if (!canAskUser(server)) throw new AdbError(hint);
+          phones.length > 1
+            ? `Several phones found on Wi-Fi:\n${describePhones(phones)}\nWhich one is yours? Check the IP address & port on your phone's Wireless debugging screen.`
+            : "No phone found on Wi-Fi. Check Wireless debugging is on, both are on the same network, and the phone was paired (pair_wifi).";
+        if (!canAskUser(server)) {
+          if (phones.length > 1) return `${hint} Then call connect_wifi with that address.`;
+          throw new AdbError(hint);
+        }
 
-        const answers = await askUser(server, `${hint} Or enter the address from the Wireless debugging screen.`, {
+        const answers = await askUser(server, `${hint} Enter the address from the Wireless debugging screen.`, {
           address: { title: "IP address & port", description: "Shown under Wireless debugging, e.g. 192.168.1.20:37123" },
         });
         if (!answers) return "Connection cancelled.";

@@ -3,8 +3,8 @@ import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
 import {
   ADDRESS_HINT,
-  connectDiscovered,
   connectedSummary,
+  connectPaired,
   isValidAddress,
   isValidPairingCode,
   pair,
@@ -37,11 +37,11 @@ async function main(): Promise<void> {
   const code = await ask("Wi-Fi pairing code: ", isValidPairingCode, PAIRING_CODE_HINT);
 
   console.log("\nPairing...");
-  console.log(await pair(address, code));
+  const paired = await pair(address, code);
+  console.log(paired);
 
   console.log("Connecting...");
-  const results = await connectDiscovered(4);
-  if (results.length > 0) console.log(results.join("\n"));
+  console.log(await connectPaired(address, paired));
 
   console.log(await connectedSummary());
   console.log("\nDone. Ask your AI assistant to control the phone, e.g. \"open Settings\".");

@@ -35,7 +35,7 @@ export function parseMdnsServices(output: string): MdnsService[] {
     .split(/\r?\n/)
     .map((line) => line.trim().split(/\s+/))
     .flatMap(([name, type, address]) => {
-      if (!name || !type || !address || !address.includes(":")) return [];
+      if (!name || !type || !address || !isValidAddress(address)) return [];
       return [{ name, type, address }];
     });
 }
@@ -77,22 +77,41 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function connectDiscovered(attempts = 1): Promise<string[]> {
+export interface PairedPhone {
+  guid?: string;
+  host: string;
+}
+
+export function pairedPhone(pairingAddress: string, pairOutput: string): PairedPhone {
+  const guid = /\[guid=([^\]\s]+)\]/.exec(pairOutput)?.[1];
+  const host = pairingAddress.slice(0, pairingAddress.lastIndexOf(":"));
+  return guid ? { guid, host } : { host };
+}
+
+export function matchesPairedPhone(service: MdnsService, phone: PairedPhone): boolean {
+  if (phone.guid) return service.name === phone.guid;
+  return service.address.slice(0, service.address.lastIndexOf(":")) === phone.host;
+}
+
+export async function findPhones(attempts = 1, phone?: PairedPhone): Promise<MdnsService[]> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const phones = await discoverPhones();
-    if (phones.length > 0) {
-      return Promise.all(
-        phones.map((phone) =>
-          connect(phone.address).catch((error: unknown) => {
-            const message = error instanceof Error ? error.message : String(error);
-            return `${phone.address}: ${message}`;
-          }),
-        ),
-      );
-    }
+    const found = (await discoverPhones()).filter((service) => !phone || matchesPairedPhone(service, phone));
+    if (found.length > 0) return found;
     if (attempt < attempts) await delay(1500);
   }
   return [];
+}
+
+export async function connectPaired(pairingAddress: string, pairOutput: string): Promise<string> {
+  const [match] = await findPhones(4, pairedPhone(pairingAddress, pairOutput));
+  if (!match) {
+    return "Paired, but the phone was not found on the network yet. Use connect_wifi with the IP address & port from the Wireless debugging screen.";
+  }
+  return connect(match.address);
+}
+
+export function describePhones(phones: MdnsService[]): string {
+  return phones.map((phone) => `${phone.address} (${phone.name})`).join("\n");
 }
 
 export async function connectedSummary(): Promise<string> {
