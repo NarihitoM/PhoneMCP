@@ -1,0 +1,37 @@
+{
+  "name": "phone-control-mcp",
+  "version": "1.0.0",
+  "description": "MCP server to control an Android phone over ADB (USB or Wi-Fi)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "phone-control-mcp": "dist/index.js",
+    "phone-control-pair": "dist/cli/pair.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "pair": "node dist/cli/pair.js",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "test": "tsc && node --test dist/**/*.test.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "android",
+    "adb"
+  ],
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}
