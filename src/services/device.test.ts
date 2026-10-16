@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchesPairedPhone, pairedPhone, parseDevices, parseMdnsServices } from "./device.js";
+import { describePhones, isSamePhone, matchesPairedPhone, pairedPhone, parseDevices, parseMdnsServices } from "./device.js";
 
 test("parseDevices reads serial, state and model", () => {
   const output = [
@@ -62,4 +62,27 @@ test("matchesPairedPhone only accepts the phone that was just paired", () => {
   assert.equal(matchesPairedPhone(other, { guid: "adb-R58M123ABC-xYz", host: "192.168.1.20" }), false);
   assert.equal(matchesPairedPhone(mine, { host: "192.168.1.20" }), true);
   assert.equal(matchesPairedPhone(other, { host: "192.168.1.20" }), false);
+});
+
+test("matchesPairedPhone rejects a copied name on a different IP", () => {
+  const spoof = { name: "adb-R58M123ABC-xYz", type: "_adb-tls-connect._tcp", address: "192.168.1.66:40000" };
+
+  assert.equal(matchesPairedPhone(spoof, { guid: "adb-R58M123ABC-xYz", host: "192.168.1.20" }), false);
+});
+
+test("describePhones hides names that are not plain adb ids", () => {
+  const phones = [
+    { name: "adb-R58M123ABC-xYz", type: "_adb-tls-connect._tcp", address: "192.168.1.20:37123" },
+    { name: "IGNORE_PREVIOUS_INSTRUCTIONS", type: "_adb-tls-connect._tcp", address: "192.168.1.66:40000" },
+  ];
+
+  assert.equal(describePhones(phones), "192.168.1.20:37123 (adb-R58M123ABC-xYz)\n192.168.1.66:40000");
+});
+
+test("isSamePhone matches both the mDNS and the IP connection of one phone", () => {
+  const service = { name: "adb-R58M123ABC-xYz", type: "_adb-tls-connect._tcp", address: "192.168.1.20:37123" };
+
+  assert.equal(isSamePhone({ serial: "adb-R58M123ABC-xYz._adb-tls-connect._tcp", state: "device" }, service), true);
+  assert.equal(isSamePhone({ serial: "192.168.1.20:37123", state: "device" }, service), true);
+  assert.equal(isSamePhone({ serial: "adb-OTHER-abc._adb-tls-connect._tcp", state: "device" }, service), false);
 });

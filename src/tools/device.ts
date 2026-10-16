@@ -5,9 +5,10 @@ import { askUser, canAskUser } from "../lib/elicit.js";
 import { respond, serialParam } from "../lib/tool.js";
 import {
   ADDRESS_HINT,
-  connect,
+  connectAddress,
   connectedSummary,
   connectPaired,
+  connectService,
   describePhones,
   deviceInfo,
   findPhones,
@@ -109,18 +110,20 @@ export function registerDeviceTools(server: McpServer): void {
     },
     ({ address }) =>
       respond(async () => {
-        if (address) return connect(address);
+        if (address) return connectAddress(address);
 
         const phones = await findPhones(2);
         const [only] = phones;
-        if (phones.length === 1 && only) return `${await connect(only.address)}\n${await connectedSummary()}`;
+        if (phones.length === 1 && only) return `${await connectService(only)}\n${await connectedSummary()}`;
 
         const hint =
           phones.length > 1
-            ? `Several phones found on Wi-Fi:\n${describePhones(phones)}\nWhich one is yours? Check the IP address & port on your phone's Wireless debugging screen.`
+            ? `Several phones found on Wi-Fi:\n${describePhones(phones)}\nCheck the IP address & port on your phone's Wireless debugging screen.`
             : "No phone found on Wi-Fi. Check Wireless debugging is on, both are on the same network, and the phone was paired (pair_wifi).";
         if (!canAskUser(server)) {
-          if (phones.length > 1) return `${hint} Then call connect_wifi with that address.`;
+          if (phones.length > 1) {
+            return `${hint}\nDo not pick one yourself. Ask the user for the IP address & port shown on their phone's Wireless debugging screen, then call connect_wifi with that address.`;
+          }
           throw new AdbError(hint);
         }
 
@@ -130,7 +133,7 @@ export function registerDeviceTools(server: McpServer): void {
         if (!answers) return "Connection cancelled.";
         if (!isValidAddress(answers.address)) throw new AdbError(ADDRESS_HINT);
 
-        return `${await connect(answers.address)}\n${await connectedSummary()}`;
+        return `${await connectAddress(answers.address)}\n${await connectedSummary()}`;
       }),
   );
 

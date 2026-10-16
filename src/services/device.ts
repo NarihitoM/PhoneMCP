@@ -4,6 +4,7 @@ import type { Device, MdnsService } from "../types/index.js";
 const CONNECT_SERVICE = "_adb-tls-connect._tcp";
 const ADDRESS_PATTERN = /^[\w.-]+:\d{1,5}$/;
 const PAIRING_CODE_PATTERN = /^\d{6}$/;
+const SERVICE_NAME_PATTERN = /^adb-[A-Za-z0-9]{1,32}-[A-Za-z0-9]{1,16}$/;
 
 export const ADDRESS_HINT = "Use the form ip:port, e.g. 192.168.1.20:37123";
 export const PAIRING_CODE_HINT = "Pairing code is 6 digits";
@@ -84,13 +85,17 @@ export interface PairedPhone {
 
 export function pairedPhone(pairingAddress: string, pairOutput: string): PairedPhone {
   const guid = /\[guid=([^\]\s]+)\]/.exec(pairOutput)?.[1];
-  const host = pairingAddress.slice(0, pairingAddress.lastIndexOf(":"));
+  const host = hostOf(pairingAddress);
   return guid ? { guid, host } : { host };
 }
 
+function hostOf(address: string): string {
+  return address.slice(0, address.lastIndexOf(":"));
+}
+
 export function matchesPairedPhone(service: MdnsService, phone: PairedPhone): boolean {
-  if (phone.guid) return service.name === phone.guid;
-  return service.address.slice(0, service.address.lastIndexOf(":")) === phone.host;
+  if (hostOf(service.address) !== phone.host) return false;
+  return !phone.guid || service.name === phone.guid;
 }
 
 export async function findPhones(attempts = 1, phone?: PairedPhone): Promise<MdnsService[]> {
@@ -102,16 +107,36 @@ export async function findPhones(attempts = 1, phone?: PairedPhone): Promise<Mdn
   return [];
 }
 
-export async function connectPaired(pairingAddress: string, pairOutput: string): Promise<string> {
-  const [match] = await findPhones(4, pairedPhone(pairingAddress, pairOutput));
-  if (!match) {
-    return "Paired, but the phone was not found on the network yet. Use connect_wifi with the IP address & port from the Wireless debugging screen.";
+export function isSamePhone(device: Device, service: MdnsService): boolean {
+  return device.serial === service.address || device.serial.startsWith(`${service.name}.`);
+}
+
+export async function connectService(service: MdnsService): Promise<string> {
+  const devices = await listDevices();
+  if (devices.some((device) => device.state === "device" && isSamePhone(device, service))) {
+    return `Already connected to ${service.address}`;
   }
-  return connect(match.address);
+  return connect(service.address);
+}
+
+export async function connectAddress(address: string): Promise<string> {
+  const service = (await discoverPhones()).find((phone) => phone.address === address);
+  return service ? connectService(service) : connect(address);
+}
+
+export async function connectPaired(pairingAddress: string, pairOutput: string): Promise<string> {
+  const matches = await findPhones(4, pairedPhone(pairingAddress, pairOutput));
+  const [match] = matches;
+  if (matches.length !== 1 || !match) {
+    return "Paired. Now connect with connect_wifi using the IP address & port shown on the phone's Wireless debugging screen.";
+  }
+  return connectService(match);
 }
 
 export function describePhones(phones: MdnsService[]): string {
-  return phones.map((phone) => `${phone.address} (${phone.name})`).join("\n");
+  return phones
+    .map((phone) => (SERVICE_NAME_PATTERN.test(phone.name) ? `${phone.address} (${phone.name})` : phone.address))
+    .join("\n");
 }
 
 export async function connectedSummary(): Promise<string> {
