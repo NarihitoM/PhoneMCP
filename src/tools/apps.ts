@@ -6,7 +6,7 @@ import { shellQuote } from "../services/text.js";
 
 const packageParam = z
   .string()
-  .regex(/^[A-Za-z]\w*(\.[A-Za-z_]\w*)+$/, "Invalid package name, e.g. com.android.settings");
+  .refine((value) => /^[A-Za-z]\w*(\.[A-Za-z_]\w*)+$/.test(value), "Invalid package name, e.g. com.android.settings");
 
 export function registerAppTools(server: McpServer): void {
   server.registerTool(
@@ -59,7 +59,7 @@ export function registerAppTools(server: McpServer): void {
     {
       title: "Open URL",
       description: "Open a link on the phone (web page, deep link, tel:, mailto:, geo:).",
-      inputSchema: { url: z.string().min(1).max(2000), serial: serialParam },
+      inputSchema: { url: z.string().min(1).max(1000), serial: serialParam },
     },
     ({ url, serial }) =>
       respond(async () => {
