@@ -1,22 +1,41 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerAppTools } from "./tools/apps.js";
-import { registerDeviceTools } from "./tools/device.js";
-import { registerInputTools } from "./tools/input.js";
-import { registerScreenTools } from "./tools/screen.js";
+import { PACKAGE_NAME, packageVersion } from "./lib/package.js";
 
-const server = new McpServer(
-  { name: "phone-control", version: "1.0.0" },
-  {
-    instructions:
-      "Controls an Android phone over ADB. Typical loop: get_ui to read the screen, tap_element / type_text / swipe / press_key to act, wait briefly, then get_ui again to confirm. Use screenshot only when get_ui has no useful elements. If no phone is connected, try connect_wifi.",
-  },
-);
+const HELP = `${PACKAGE_NAME} ${packageVersion()}
 
-registerDeviceTools(server);
-registerScreenTools(server);
-registerInputTools(server);
-registerAppTools(server);
+Control an Android phone from AI tools (Claude, Cursor, Codex, Gemini, OpenCode...).
 
-await server.connect(new StdioServerTransport());
+Usage:
+  phone-mcp setup     Install adb, add the phone server to your AI tools, pair your phone
+  phone-mcp pair      Pair a phone over Wi-Fi (asks for IP address & port and pairing code)
+  phone-mcp           Start the MCP server (your AI tool runs this)
+
+Setup options:
+  --yes               Add to every AI tool found, without asking
+  --clients a,b       Only these tools: claude-code, claude-desktop, cursor, vscode,
+                      windsurf, gemini, codex, opencode
+  --address ip:port   Pairing IP address & port from the phone
+  --code 123456       Pairing code from the phone
+  --no-pair           Skip pairing
+
+Run with npx without installing:  npx ${PACKAGE_NAME} setup`;
+
+const [command] = process.argv.slice(2);
+
+if (command === "setup") {
+  const { runSetupCommand } = await import("./cli/setup.js");
+  await runSetupCommand(process.argv.slice(3));
+} else if (command === "pair") {
+  const { runPairCommand } = await import("./cli/pair.js");
+  await runPairCommand(process.argv.slice(3));
+} else if (command === "--help" || command === "-h" || command === "help") {
+  console.log(HELP);
+} else if (command === "--version" || command === "-v") {
+  console.log(packageVersion());
+} else if (command) {
+  console.error(`Unknown command: ${command}\n\n${HELP}`);
+  process.exitCode = 1;
+} else {
+  const { startServer } = await import("./server.js");
+  await startServer();
+}

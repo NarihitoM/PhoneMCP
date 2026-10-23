@@ -7,46 +7,64 @@ It works over **Wi-Fi** (phone and computer on the same router, no cable) or **U
 
 ---
 
-## Easiest: let your AI agent set it up
+## Quick start (one command)
 
-If the steps below look hard, let an AI coding agent do them for you. It needs to be one that can run terminal commands, such as Claude Code, Codex CLI, Gemini CLI, Cursor (agent mode) or OpenCode.
-
-1. Download this project (`git clone https://github.com/NarihitoM/PhoneMCP.git`, or **Code > Download ZIP** on GitHub) and open your AI agent inside the folder.
-2. Copy the prompt below and paste it into the agent.
-3. Answer its questions. It will ask before installing anything and will ask you for the pairing details shown on your phone.
+You need [Node.js 20 or newer](https://nodejs.org) and an Android phone (Android 11+ for Wi-Fi).
 
 ```
-Set up the Phone Control MCP server in this folder for me, following README.md.
-
-1. Check Node.js 20 or newer is installed. If not, tell me how to install it and stop.
-2. Check adb is installed with `adb version`. If not, install Android platform-tools
-   using the command for my operating system from README Step 1. Ask me before installing.
-3. Run `npm install` in this folder and confirm that `dist/index.js` exists.
-4. Add this server, named "phone", to the AI tool you are running in right now, using the
-   absolute path to this folder's `dist/index.js` (forward slashes on Windows). Use the
-   matching config from README Step 3. Do not remove or change my other MCP servers.
-   Confirm it is registered and connected.
-5. Help me connect my phone:
-   - Walk me through turning on Developer options and Wireless debugging (README Steps 4 and 5).
-   - Ask me for the "IP address & port" and the 6-digit "Wi-Fi pairing code" from the
-     "Pair device with pairing code" popup, then run `adb pair <ip:port> <code>`.
-   - Connect with `adb mdns services` and `adb connect <address>`. If the phone is not found,
-     ask me for the IP address & port shown on the main Wireless debugging screen.
-   - If my phone and computer cannot share a Wi-Fi network, suggest the computer hotspot or
-     USB options from the README.
-6. Check that `adb devices` lists my phone as `device`.
-7. Tell me to restart the AI tool or open a new conversation so the phone tools load, and
-   suggest a first thing to try, like "what's on my phone screen?".
-
-Rules: never use `adb tcpip`. Explain each step in simple words. If something fails, check
-the Troubleshooting section of README.md before trying other fixes.
+npm install -g phone-mcp-by-narihito
+phone-mcp setup
 ```
 
-Prefer to do it yourself? Follow the steps below.
+Or run it without installing: `npx phone-mcp-by-narihito setup`
+
+The setup does everything for you:
+
+1. Finds `adb`, or downloads Google's official platform-tools (checksum verified) into `~/.phone-mcp`.
+2. Adds the `phone` server to every AI tool it finds: Claude Code, Claude Desktop, Cursor,
+   VS Code, Windsurf, Gemini CLI, Codex CLI and OpenCode. Your other MCP servers are kept and a
+   `.bak` backup is made of each config file.
+3. Pairs your phone. On the phone open **Settings > Developer options > Wireless debugging >
+   Pair device with pairing code**, then type the IP address & port and the 6-digit code.
+
+Restart your AI tool and ask "what's on my phone screen?".
+
+| Option | What it does |
+|--------|--------------|
+| `--yes`, `-y` | Accept all defaults without asking |
+| `--clients cursor,vscode` | Only set up these tools |
+| `--address <ip:port> --code <code>` | Pair without prompts |
+| `--no-pair` | Skip pairing |
+
+Pair again later (new phone, or after resetting Wireless debugging): `phone-mcp pair`
+
+Never turned on Developer options? See [Step 4](#step-4-turn-on-developer-options-on-the-phone).
 
 ---
 
-## Quick setup (about 10 minutes)
+## Let your AI agent set it up
+
+Paste this into an AI agent that can run terminal commands (Claude Code, Codex CLI, Gemini CLI,
+Cursor agent mode, OpenCode):
+
+```
+Set up the Phone Control MCP server for me.
+
+1. Check Node.js 20 or newer is installed. If not, tell me how to install it and stop.
+2. Run `npx -y phone-mcp-by-narihito setup --no-pair --yes` and show me the result.
+3. Walk me through turning on Developer options and Wireless debugging on my Android phone,
+   then ask me for the "IP address & port" and 6-digit code from "Pair device with pairing code".
+4. Run `npx -y phone-mcp-by-narihito pair --address <ip:port> --code <code>`.
+5. Tell me to restart this AI tool so the phone tools load.
+
+Rules: never use `adb tcpip`. Explain each step in simple words. If something fails, read the
+Troubleshooting section of https://github.com/NarihitoM/PhoneMCP before trying other fixes.
+```
+
+---
+
+## Manual setup
+
 
 You need:
 

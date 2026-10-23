@@ -1,6 +1,4 @@
-#!/usr/bin/env node
-import { stdin as input, stdout as output } from "node:process";
-import { createInterface } from "node:readline/promises";
+import { parseArgs } from "node:util";
 import {
   ADDRESS_HINT,
   connectedSummary,
@@ -10,31 +8,29 @@ import {
   pair,
   PAIRING_CODE_HINT,
 } from "../services/device.js";
+import { Prompt } from "./prompt.js";
 
-const prompt = createInterface({ input, output, terminal: Boolean(input.isTTY) });
-const lines = prompt[Symbol.asyncIterator]();
-
-async function ask(question: string, isValid: (value: string) => boolean, hint: string): Promise<string> {
-  for (;;) {
-    output.write(question);
-    const line = await lines.next();
-    if (line.done) throw new Error("Input closed before the pairing details were entered.");
-
-    const answer = String(line.value).trim();
-    if (!input.isTTY) output.write(`${answer}\n`);
-    if (isValid(answer)) return answer;
-    console.log(`  ${hint}`);
-  }
+export interface PairOptions {
+  address?: string;
+  code?: string;
 }
 
-async function main(): Promise<void> {
-  console.log("Pair your phone over Wi-Fi\n");
-  console.log("1. Connect the phone and this computer to the same Wi-Fi.");
-  console.log("2. On the phone: Settings > Developer options > Wireless debugging (turn it on).");
-  console.log("3. Tap 'Pair device with pairing code' and keep the popup open.\n");
+export const PAIRING_STEPS = [
+  "1. Connect the phone and this computer to the same Wi-Fi.",
+  "2. On the phone: Settings > Developer options > Wireless debugging (turn it on).",
+  "   No Developer options? Settings > About phone > tap Build number 7 times.",
+  "3. Tap 'Pair device with pairing code' and keep the popup open.",
+].join("\n");
 
-  const address = await ask("IP address & port: ", isValidAddress, ADDRESS_HINT);
-  const code = await ask("Wi-Fi pairing code: ", isValidPairingCode, PAIRING_CODE_HINT);
+export async function runPair(prompt: Prompt, options: PairOptions = {}): Promise<boolean> {
+  const address =
+    options.address && isValidAddress(options.address)
+      ? options.address
+      : await prompt.ask("IP address & port: ", isValidAddress, ADDRESS_HINT);
+  const code =
+    options.code && isValidPairingCode(options.code)
+      ? options.code
+      : await prompt.ask("Wi-Fi pairing code: ", isValidPairingCode, PAIRING_CODE_HINT);
 
   console.log("\nPairing...");
   const paired = await pair(address, code);
@@ -43,15 +39,27 @@ async function main(): Promise<void> {
   console.log("Connecting...");
   console.log(await connectPaired(address, paired));
 
-  console.log(await connectedSummary());
-  console.log("\nDone. Ask your AI assistant to control the phone, e.g. \"open Settings\".");
+  const summary = await connectedSummary();
+  console.log(summary);
+  return summary.startsWith("Ready");
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`\n${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-} finally {
-  prompt.close();
+export async function runPairCommand(argv: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: argv,
+    options: { address: { type: "string" }, code: { type: "string" } },
+    allowPositionals: false,
+  });
+
+  const prompt = new Prompt();
+  try {
+    console.log(`Pair your phone over Wi-Fi\n\n${PAIRING_STEPS}\n`);
+    await runPair(prompt, values);
+    console.log('\nDone. Ask your AI assistant to control the phone, e.g. "open Settings".');
+  } catch (error) {
+    console.error(`\n${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  } finally {
+    prompt.close();
+  }
 }

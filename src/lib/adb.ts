@@ -18,10 +18,14 @@ interface RunOptions {
   timeoutMs?: number;
 }
 
-function resolveAdbPath(): string {
+const ADB_EXE = process.platform === "win32" ? "adb.exe" : "adb";
+
+export const LOCAL_PLATFORM_TOOLS = join(homedir(), ".phone-mcp", "platform-tools");
+
+export function resolveAdbPath(): string {
   if (process.env.ADB_PATH) return process.env.ADB_PATH;
 
-  const exe = process.platform === "win32" ? "adb.exe" : "adb";
+  const exe = ADB_EXE;
   const roots = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT];
   const localAppData =
     process.platform === "win32" ? (process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local")) : undefined;
@@ -37,12 +41,11 @@ function resolveAdbPath(): string {
 
   const candidates = roots.flatMap((root) => (root ? [join(root, "platform-tools", exe)] : []));
   if (localAppData) candidates.push(join(localAppData, "Microsoft", "WinGet", "Links", exe));
+  candidates.push(join(LOCAL_PLATFORM_TOOLS, exe));
   if (process.platform !== "win32") candidates.push("/opt/homebrew/bin/adb", "/usr/local/bin/adb", "/usr/bin/adb");
 
   return candidates.find((candidate) => existsSync(candidate)) ?? "adb";
 }
-
-const adbPath = resolveAdbPath();
 
 function withSerial(args: string[], serial?: string): string[] {
   const target = serial ?? process.env.ANDROID_SERIAL;
@@ -53,9 +56,7 @@ function friendlyError(output: string, code: string | number | null | undefined)
   const text = output.trim();
 
   if (code === "ENOENT") {
-    return new AdbError(
-      "adb was not found. Install Android platform-tools (winget install Google.PlatformTools) or set ADB_PATH.",
-    );
+    return new AdbError("adb was not found. Run `npx phone-mcp-by-narihito setup` to install it, or set ADB_PATH.");
   }
   if (/more than one device/i.test(text)) {
     return new AdbError("More than one device is connected. Pass a serial (see list_devices) or set ANDROID_SERIAL.");
@@ -76,7 +77,7 @@ function friendlyError(output: string, code: string | number | null | undefined)
 function runAdb(args: string[], timeoutMs: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     execFile(
-      adbPath,
+      resolveAdbPath(),
       args,
       { encoding: "buffer", maxBuffer: MAX_BUFFER, timeout: timeoutMs, windowsHide: true },
       (error, stdout, stderr) => {
@@ -108,4 +109,13 @@ export async function adbGlobal(args: string[], timeoutMs = DEFAULT_TIMEOUT_MS):
 
 export function shell(command: string, options: RunOptions = {}): Promise<string> {
   return adb(["shell", command], options);
+}
+
+export async function adbVersion(): Promise<string | null> {
+  try {
+    const output = await adbGlobal(["version"], 15_000);
+    return output.split(/\r?\n/)[1]?.trim() ?? output.trim();
+  } catch {
+    return null;
+  }
 }

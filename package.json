@@ -1,17 +1,24 @@
 {
-  "name": "phone-control-mcp",
+  "name": "phone-mcp-by-narihito",
   "version": "1.0.0",
-  "description": "MCP server to control an Android phone over ADB (USB or Wi-Fi)",
+  "description": "MCP server to control an Android phone from AI tools over Wi-Fi or USB, with one-command setup",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "phone-control-mcp": "dist/index.js",
-    "phone-control-pair": "dist/cli/pair.js"
+    "phone-mcp": "dist/index.js",
+    "phone-mcp-by-narihito": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "prepare": "tsc",
-    "pair": "node dist/cli/pair.js",
+    "prepublishOnly": "npm test",
+    "setup": "node dist/index.js setup",
+    "pair": "node dist/index.js pair",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "test": "tsc && node --test dist/**/*.test.js",
@@ -19,10 +26,24 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "android",
-    "adb"
+    "adb",
+    "phone",
+    "claude",
+    "cursor",
+    "ai-agent"
   ],
+  "author": "NarihitoM",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NarihitoM/PhoneMCP.git"
+  },
+  "homepage": "https://github.com/NarihitoM/PhoneMCP#readme",
+  "bugs": {
+    "url": "https://github.com/NarihitoM/PhoneMCP/issues"
+  },
   "engines": {
     "node": ">=20"
   },
